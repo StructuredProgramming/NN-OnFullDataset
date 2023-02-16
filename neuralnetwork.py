@@ -30,6 +30,8 @@ import time
 import math
 from itertools import combinations
 from PIL import Image as PImage
+np.set_printoptions(threshold=sys.maxsize)
+np.set_printoptions(suppress=True)
 device="cuda"
 def weights_init(m):
     if isinstance(m, nn.Linear):
