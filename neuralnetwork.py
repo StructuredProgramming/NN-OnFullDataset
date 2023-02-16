@@ -32,7 +32,7 @@ from itertools import combinations
 from PIL import Image as PImage
 np.set_printoptions(threshold=sys.maxsize)
 np.set_printoptions(suppress=True)
-device="cuda"
+device="cpu"
 def is_simple(tpMat):
     # simple: i.e., this can be solved with chain tree and intersection of circles/arc sects.
     # find links and set up joint table.
@@ -408,22 +408,23 @@ for epoch in range (200):
     runningnum=0
     random.shuffle(lines)
     for line in lines:
+        total360loss=0
         count+=1
         x, y = line.split('=')[0], line.split('=')[1]
-        a=line.split('=')
-        if len(a)==6:
-            movingjoint1=a[2]
-            movingjoint2=a[3]
-            movingjoint3=a[4]
-            movingjoint4=a[5]
+        w=line.split('=')
+        if len(w)==6:
+            movingjoint1=w[2]
+            movingjoint2=w[3]
+            movingjoint3=w[4]
+            movingjoint4=w[5]
             x1,y1=coords(movingjoint1)
             x2,y2=coords(movingjoint2)
             x3,y3=coords(movingjoint3)
             x4,y4=coords(movingjoint4)
         else:
-            movingjoint1=a[3]
-            movingjoint2=a[5]
-            movingjoint3=a[6]
+            movingjoint1=w[3]
+            movingjoint2=w[5]
+            movingjoint3=w[6]
             movingjoint4=(0,0)
             x1,y1=coords(movingjoint1)
             x2,y2=coords(movingjoint2)
@@ -541,7 +542,7 @@ for epoch in range (200):
             myloss=loss.item()
             if(count%100==0):
                 count=0
-                print(myloss)
+                #print(myloss)
             itertrain+=1
             trainloss+=loss
             #print(prediction)
@@ -550,7 +551,93 @@ for epoch in range (200):
             count=0
             testloss+=loss
             itertest+=1
+        if(len(w)==6):
+            j_0=(0,0)
+            j_1=(output_tensor[0],output_tensor[4])
+            j_2=(output_tensor[1],output_tensor[5])
+            j_3=(1,0)
+            j_4=(output_tensor[2],output_tensor[6])
+            j_5=(output_tensor[3],output_tensor[7])
+            j_6=(1.5,0)
+            l_0 = math.dist(np.array(j_3),np.array(j_0))
+            l_1 = math.dist(np.array(j_1),np.array(j_0))
+            l_2 = math.dist(np.array(j_2),np.array(j_1))
+            l_3 = math.dist(np.array(j_3),np.array(j_2))
+            total = l_0 + l_1 + l_2 + l_3
+            shortest = min(l_0, l_1, l_2, l_3)
+            longest = max(l_0, l_1, l_2, l_3)
+            pq = total - shortest - longest
+            if shortest + longest <= pq:
+                if min(l_0, l_1, l_2, l_3) == l_0 or min(l_0, l_1, l_2, l_3) == l_2:
+                    continue
+
+                elif min(l_0, l_1, l_2, l_3) == l_1:
+                    tp_steph_3 = np.matrix([
+                [1, -1, 0, 1, 0, 0, 1],
+                [1, 2, 1, 0, 1, 0, 0],
+                [0, 1, 2, 1, 1, 0, 0],
+                [1, 0, 1, 1, 0, 0, 1],
+                [0, 1, 1, 0, 2, 1, 0],
+                [0, 0, 0, 0, 1, 2, 1],
+                [1, 0, 0, 1, 0, 1, 1]
+            ])
+
+                    rMatTest = np.array([[0, 1.0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0]])
+                else:
+                    tp_steph_3 = np.matrix([
+                [1, 1, 0, 1, 0, 0, 1],
+                [1, 2, 1, 0, 1, 0, 0],
+                [0, 1, 2, 1, 1, 0, 0],
+                [1, 0, -1, 1, 0, 0, 1],
+                [0, 1, 1, 0, 2, 1, 0],
+                [0, 0, 0, 0, 1, 2, 1],
+                [1, 0, 0, 1, 0, 1, 1]
+            ])
+
+                    rMatTest = np.array([[0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 1.0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0]])
+                if j_4 not in [j_0, j_1, j_2, j_3, j_5, j_6]:
+                    plt.clf()
+
+                posInit = np.array([j_0, j_1, j_3, j_2, j_4, j_6, j_5])
+                jdxTest1, _, _ = compute_curve_simple(tp_steph_3, posInit, rMatTest)
+
+                if len(jdxTest1[4, :, 0]) < 360:
+                    continue
+
+                points_x, points_y = np.asarray(jdxTest1[4, :, 0]), np.asarray(jdxTest1[4, :, 1])
+
+                points_x, points_y = np.subtract(points_x, np.mean(points_x)), np.subtract(points_y, np.mean(points_y))
+
+                points_x, points_y = np.divide(points_x, np.sqrt(np.var(points_x))), np.divide(points_y, np.sqrt(np.var(
+                    points_y)))
+
+                theta, is_inf = get_pca_inclination(np.asarray(points_x), np.asarray(points_y))
+
+                if not is_inf:
+                    points_x, points_y = rotate_curve(points_x, points_y, -theta)
+                    print(len(points_x))
+                    print(len(x))
+                    x=torch.tensor(x)
+                    points_x=torch.tensor(points_x)
+                    runningloss1=nn.MSELoss(x,points_x)
+                    runningloss2=nn.MSELoss(y,points_y)
+                    total360pointloss=(runningloss1+runningloss2)/2
+                    print(total360pointloss)
     myfinaltrainloss.append(trainloss/itertrain)
     myfinaltestloss.append(testloss/itertrain)
 print(myfinaltrainloss)
 print(myfinaltestloss)
+
+
