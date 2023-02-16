@@ -21,8 +21,16 @@ import numpy as np
 import pywt
 import random
 import matplotlib.pyplot as plt
+import scipy.spatial.distance as sciDist
+import copy
+import itertools
+import numpy as np
+import sys
+import time
+import math
+from itertools import combinations
 from PIL import Image as PImage
-device="cpu"
+device="cuda"
 def weights_init(m):
     if isinstance(m, nn.Linear):
       torch.nn.init.kaiming_uniform_(m.weight)
